@@ -2,15 +2,17 @@
 __author__ = 'zouchong'
 
 from PIL import Image
+import sys
 
 class UnionpayCaptcha:
-
-    blank_path = './blank.jpg'
+    
+    CURRENT_PATH = sys.path[0].replace('\\', '/')
+    blank_path = '{0}/blank.jpg'.format(CURRENT_PATH)
     threshold = 70
-    templates_path = './'
+    templates_path = '{0}/'.format(CURRENT_PATH)
 
     # 去除那个1像素宽的边框
-    def CropEdge(self, img):
+    def crop_edge(self, img):
         img = Image.open(img)
         width = img.size[0]
         height = img.size[1]
@@ -18,7 +20,7 @@ class UnionpayCaptcha:
         return cropped
 
     # 去除噪点
-    def VanishNoise(self, img):
+    def vanish_noise(self, img):
         width = img.size[0]
         height = img.size[1]
         for h in range(height):
@@ -32,11 +34,11 @@ class UnionpayCaptcha:
                     img.putpixel((w, h), (255, 255, 255))
         return img
 
-    def SplitCharacters(self, img):
+    def split_characters(self, img):
         width = img.size[0]
         height = img.size[1]
         columns = []
-        def IsColumnWhite(col):
+        def is_column_white(col):
             for h in range(height):
                 if (0, 0, 0) == img.getpixel((col, h)):
                     return False
@@ -54,10 +56,10 @@ class UnionpayCaptcha:
         char_span = [] # 标记当前列是否为白
         for i in range(width):
             if len(char_span) == 0:
-                if not IsColumnWhite(i):
+                if not is_column_white(i):
                     char_span.append(i)
             else:
-                if IsColumnWhite(i):
+                if is_column_white(i):
                     char_span.append(i)
                     columns.append(char_span)
                     char_span = []
@@ -68,10 +70,10 @@ class UnionpayCaptcha:
             splits.append(img.crop((i[0], 0, i[1], height)))
         return splits
 
-    def CompressCharacters(self, img):
+    def compress_characters(self, img):
         width = img.size[0]
         height = img.size[1]
-        def IsRowWhite(row):
+        def is_row_white(row):
             for w in range(width):
                 if (0, 0, 0) == img.getpixel((w, row)):
                     return False
@@ -79,16 +81,16 @@ class UnionpayCaptcha:
         top = 0
         bottom = height
         while 1:
-            if not IsRowWhite(top):
+            if not is_row_white(top):
                 break
             top += 1
         while 1:
-            if not IsRowWhite(bottom - 1):
+            if not is_row_white(bottom - 1):
                 break
             bottom -= 1
         return img.crop((0, top, width, bottom))
 
-    def CreateHash(self, img):
+    def create_hash(self, img):
         base = Image.open(self.blank_path)
         base.paste(img, (0, 0))
         width = base.size[0]
@@ -102,32 +104,32 @@ class UnionpayCaptcha:
                 hashstr += '0' if rval > self.threshold and gval > self.threshold and bval > self.threshold else '1'
         return hashstr
 
-    def CalculateHammingDistance(self, hash1, hash2):
+    def calculate_hamming_distance(self, hash1, hash2):
         diff = (int(hash1, 16)) ^ (int(hash2, 16))
         return bin(diff).count('1')
 
-    def LoadHash(self):
+    def load_hash(self):
         alphabets = 'abcdefghijklmnpqrstuvwxyz123456789'
         hash_dict = {}
         for i in range(len(alphabets)):
             img = Image.open(self.templates_path + alphabets[i] + '.jpg')
-            hash_dict[alphabets[i]] = self.CreateHash(img)
+            hash_dict[alphabets[i]] = self.create_hash(img)
         return hash_dict
 
 def solve(filepath):
     upc = UnionpayCaptcha()
-    hash_dict = upc.LoadHash()
-    img = upc.CropEdge(filepath)
-    img = upc.VanishNoise(img)
-    upc.SplitCharacters(img)
-    sc = upc.SplitCharacters(img)
+    hash_dict = upc.load_hash()
+    img = upc.crop_edge(filepath)
+    img = upc.vanish_noise(img)
+    upc.split_characters(img)
+    sc = upc.split_characters(img)
     captcha = ''
     for i in range(len(sc)):
-        ci = upc.CompressCharacters(sc[i])
+        ci = upc.compress_characters(sc[i])
         mindiff = 17 ** 2
         match = ''
         for key in hash_dict:
-            hd = upc.CalculateHammingDistance(upc.CreateHash(ci), hash_dict[key])
+            hd = upc.calculate_hamming_distance(upc.create_hash(ci), hash_dict[key])
             if hd < mindiff:
                 mindiff = hd
                 match = key
@@ -135,4 +137,4 @@ def solve(filepath):
     return captcha
 
 if __name__ == '__main__':
-    print(solve())
+    print(solve()))
