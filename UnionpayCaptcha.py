@@ -137,4 +137,4 @@ def solve(filepath):
     return captcha
 
 if __name__ == '__main__':
-    print(solve()))
+    print(solve())
